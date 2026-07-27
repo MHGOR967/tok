@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// تخزين مؤقت لجلسات المستخدمين النشطة
 const activeSessions = {};
 
 app.get('/', (req, res) => {
@@ -32,7 +31,7 @@ app.get('/', (req, res) => {
                     <img id="qrImage" src="" alt="QR Code" class="hidden w-48 h-48 mx-auto">
                 </div>
                 <div>
-                    <button onclick="loadQRCode()" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs px-4 py-2 rounded-lg border border-slate-700 transition">
+                    <button onclick="loadQRCode()" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs px-4 py-2 rounded-lg border border-slate-700 transition cursor-pointer">
                         🔄 تحديث الباركود
                     </button>
                 </div>
@@ -48,7 +47,7 @@ app.get('/', (req, res) => {
                     </div>
                 </div>
                 <button onclick="startCleaning()" id="cleanBtn"
-                    class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-rose-900/25">
+                    class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-rose-900/25 cursor-pointer">
                     🗑️ بدء حذف الريبوستات الحقيقية
                 </button>
             </div>
@@ -77,7 +76,6 @@ app.get('/', (req, res) => {
                         document.getElementById('qrImage').classList.remove('hidden');
                         document.getElementById('statusText').innerText = 'افتح تطبيق تيك توك بجوالك واعمل مسح للباركود الآن!';
                         
-                        // بدء مراقبة حالة تسجيل الدخول
                         if (checkInterval) clearInterval(checkInterval);
                         checkInterval = setInterval(checkLoginStatus, 3000);
                     } else {
@@ -116,7 +114,6 @@ app.get('/', (req, res) => {
                 document.getElementById('statusText').innerText = data.message;
             }
 
-            // تحميل الباركود تلقائياً عند فتح الصفحة
             window.onload = loadQRCode;
         </script>
     </body>
@@ -124,9 +121,8 @@ app.get('/', (req, res) => {
   `);
 });
 
-// مسار توليد جلسة متصفح وهمية وجلب صورة QR Code حقيقية من تيك توك
 app.get('/api/get-qr', async (req, res) => {
-  const token = Math.random().toString(36.substring(2));
+  const token = Math.random().toString(36).substring(2);
   try {
     const browser = await puppeteer.launch({
       headless: true,
@@ -135,9 +131,8 @@ app.get('/api/get-qr', async (req, res) => {
     const page = await browser.newPage();
     await page.goto('https://www.tiktok.com/login/phone-or-email/qr-code', { waitUntil: 'networkidle2' });
     
-    // الانتظار حتى يظهر عنصر الباركود والتقاط صورة له
     await page.waitForSelector('img', { timeout: 10000 });
-    const qrElement = await page.$('img'); // البحث عن صورة الباركود في الصفحة
+    const qrElement = await page.$('img');
     let qrImage = '';
     if (qrElement) {
       const buffer = await qrElement.screenshot();
@@ -152,7 +147,6 @@ app.get('/api/get-qr', async (req, res) => {
   }
 });
 
-// فحص هل قام المستخدم بمسح الباركود ودخل الحساب
 app.get('/api/check-status', async (req, res) => {
   const { token } = req.query;
   const session = activeSessions[token];
@@ -166,7 +160,6 @@ app.get('/api/check-status', async (req, res) => {
       session.logged = true;
       const sid = sessionCookie.value;
 
-      // سحب البيانات الحقيقية عبر الـ API باستخدام الكوكيز الملتقطة
       const infoRes = await axios.get('https://www.tiktok.com/passport/web/account/info/', {
         headers: { 'Cookie': `sessionid=${sid}`, 'User-Agent': 'Mozilla/5.0' },
         validateStatus: () => true
@@ -191,7 +184,6 @@ app.get('/api/check-status', async (req, res) => {
   res.json({ logged: false });
 });
 
-// مسار الحذف الفعلي للريبوستات
 app.post('/api/clean', async (req, res) => {
   const { token } = req.body;
   const session = activeSessions[token];
@@ -214,7 +206,6 @@ app.post('/api/clean', async (req, res) => {
           validateStatus: () => true
         });
       }
-      // إغلاق المتصفح بعد الانتهاء لتوفير رامات السيرفر
       if (session.browser) await session.browser.close();
       return res.json({ success: true, message: 'تم إزالة جميع الريبوستات بنجاح من حسابك الحقيقي!' });
     }
